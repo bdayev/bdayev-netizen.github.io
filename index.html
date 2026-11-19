@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="hy"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -38,7 +37,7 @@ button:disabled{opacity:.6}
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {initializeFirestore,doc,collection,getDoc,setDoc,updateDoc,deleteDoc,onSnapshot,query,where,getDocs} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import {getAuth,createUserWithEmailAndPassword,signInWithEmailAndPassword,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getAuth,signInAnonymously,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 /* ====== ՍԱ ՓՈԽԵՔ. Firebase Console → Project settings → Your apps → Web app ====== */
 const FIREBASE_CONFIG={
@@ -80,16 +79,10 @@ const isHost=()=>!!uid&&G&&G.hostId===uid;
 function init(){
   if(FIREBASE_CONFIG.apiKey.startsWith('YOUR')){app.replaceChildren($('h1',{},'🎅 Գաղտնի Սանտա'),$('p',{cls:'msg'},'Նախ index.html-ում լրացրեք FIREBASE_CONFIG-ը (տես README.md)։'));return}
   addEventListener('hashchange',route);route();
-  onAuthStateChanged(auth,u=>{uid=u?u.uid:null;uname=u?u.email.split('@')[0]:'';if(!code)home();else{phaseKey='';if(G!==undefined)draw()}})}
+  onAuthStateChanged(auth,u=>{
+    if(!u){signInAnonymously(auth).catch(e=>{app.prepend($('p',{cls:'msg'},'Չհաջողվեց միանալ ('+(e.code||'')+')։ Firebase → Authentication → Sign-in method → Anonymous՝ միացրեք։'))});return}
+    uid=u.uid;if(!code)home();else{phaseKey='';if(G!==undefined)draw()}})}
 function route(){const c=location.hash.slice(1).toUpperCase();c?openGame(c):home()}
-
-function authCard(){
-  const u=$('input',{placeholder:'Username',maxLength:30,autocomplete:'username'}),p=$('input',{type:'password',placeholder:'Password (առնվազն 6 նիշ)',autocomplete:'current-password'}),m=$('p',{cls:'msg'});
-  const go=async reg=>{const n=u.value.trim().toLowerCase();
-    if(!/^[a-z0-9_-]{3,30}$/.test(n)||p.value.length<6){m.textContent='Username՝ 3+ լատինական տառ/թիվ, password՝ առնվազն 6 նիշ';return}
-    try{const f=reg?createUserWithEmailAndPassword:signInWithEmailAndPassword;await f(auth,n+'@'+DOM,p.value)}
-    catch(e){const c=e.code||'';m.textContent=c.includes('already')?'Այս username-ը զբաղված է':(c.includes('credential')||c.includes('password')||c.includes('user-not-found'))?'Սխալ username կամ password':'Չհաջողվեց ('+c+')'}};
-  return $('div',{cls:'card'},$('h2',{},'Հեղինակի մուտք'),$('p',{cls:'sub'},'Խաղ ստեղծելու համար մուտք գործիր կամ գրանցվիր։'),u,p,$('div',{cls:'row'},$('button',{on:{click:()=>go(false)}},'Մուտք'),$('button',{cls:'g',on:{click:()=>go(true)}},'Գրանցվել')),m)}
 
 async function home(){
   stop();code=null;G=null;
@@ -99,14 +92,13 @@ async function home(){
   const cn=$('input',{placeholder:'Սենյակի կոդ',maxLength:8,style:'text-transform:uppercase'});
   const mine=$('div');
   app.replaceChildren($('h1',{},'🎅 Գաղտնի Սանտա'),$('p',{cls:'sub'},'Ստեղծիր խաղ, կիսվիր կոդով, իսկ ժամը լրանալուց հետո ամեն մեկը կպտտի և կիմանա՝ ում է նվեր տալու։'),
-   uid?'':authCard(),
    $('div',{cls:'card',hidden:!uid},$('h2',{},'Նոր խաղ (հեղինակ)'),gn,$('label',{},'Գրանցումը փակվում է ժամը՝ '),tm,
      $('button',{on:{click:async()=>{
        const name=cl(gn.value);if(!name){msg.textContent='Գրիր խաղի անունը';return}
        let c;for(let i=0;i<6;i++){c=Array.from({length:5},()=>ALPHA[Math.floor(Math.random()*ALPHA.length)]).join('');if(!(await db.doc('games/'+c).get()).exists)break}
-       try{await db.doc('games/'+c).set({name,hostId:uid,hostName:uname,deadline:nextAt(tm.value||'20:00'),closed:false,seed:Math.random().toString(36).slice(2),createdAt:Date.now()});location.hash=c}catch(e){msg.textContent='Չհաջողվեց ստեղծել'}}}},'Ստեղծել խաղ')),
+       try{await db.doc('games/'+c).set({name,hostId:uid,deadline:nextAt(tm.value||'20:00'),closed:false,seed:Math.random().toString(36).slice(2),createdAt:Date.now()});location.hash=c}catch(e){msg.textContent='Չհաջողվեց ստեղծել'}}}},'Ստեղծել խաղ')),
    $('div',{cls:'card'},$('h2',{},'Մտնել սենյակ'),cn,$('button',{cls:'g',on:{click:()=>{const c=cn.value.trim().toUpperCase();if(c)location.hash=c}}},'Մտնել')),
-   msg,uid?$('div',{cls:'card'},$('h2',{},'Իմ խաղերը · '+uname),mine,$('button',{cls:'link',on:{click:()=>signOut(auth)}},'Դուրս գալ հաշվից')):'');
+   msg,uid?$('div',{cls:'card'},$('h2',{},'Իմ խաղերը (այս սարքում)'),mine):'');
   if(!uid)return;
   try{const s=await db.collection('games').where('hostId','==',uid).get();
     const arr=s.docs.sort((a,b)=>(b.data().createdAt||0)-(a.data().createdAt||0));

@@ -159,14 +159,30 @@ function build(ph){
       act.append($('div',{cls:'card'},$('h2',{},'Ո՞վ ես դու'),sel,btn,reel,msg))}
   }
   app.replaceChildren($('h1',{},'🎅 Գաղտնի Սանտա'),hdr,act,lst)}
-function spin(sel,reel,btn,msg){
+async function spin(sel,reel,btn,msg){
   msg.textContent='';if(!sel.value){msg.textContent='Նախ ընտրիր քո անունը';return}
-  const me=P.find(p=>p.id===sel.value),to=P.find(p=>p.id===pairs()[sel.value]);
-  if(!me||!to){msg.textContent='Սխալ';return}
-  lsSet('ss_name',me.name);btn.disabled=true;reel.classList.remove('win');
-  const others=P.filter(p=>p.id!==me.id);let i=0;const N=26;
-  (function step(){
-    if(i>=N){reel.textContent='🎁 '+to.name;reel.classList.add('win');btn.disabled=false;btn.textContent='Տեսնել նորից';return}
-    reel.textContent=others[Math.floor(Math.random()*others.length)].name;i++;setTimeout(step,45+i*i*0.7)})()}
+  if(!uid){msg.textContent='Սպասիր մի վայրկյան և նորից սեղմիր';return}
+  const nm=id=>(P.find(p=>p.id===id)||{}).name||'';
+  const show=(id,anim)=>{
+    const to=P.find(p=>p.id===pairs()[id]);if(!to){msg.textContent='Սխալ';btn.disabled=false;return}
+    reel.classList.remove('win');
+    if(!anim){reel.textContent='🎁 '+to.name;reel.classList.add('win');btn.disabled=true;btn.textContent='Արդեն պտտված է';return}
+    const others=P.filter(p=>p.id!==id);let i=0;const N=26;
+    (function step(){
+      if(i>=N){reel.textContent='🎁 '+to.name;reel.classList.add('win');btn.textContent='Արդեն պտտված է';return}
+      reel.textContent=others[Math.floor(Math.random()*others.length)].name;i++;setTimeout(step,45+i*i*0.7)})()};
+  btn.disabled=true;
+  try{
+    const mine=await db.doc('games/'+code+'/spins/u_'+uid).get();
+    if(mine.exists){
+      const d=mine.data();sel.value=d.pid;
+      msg.textContent=d.pid===sel.value&&nm(d.pid)?'Դու արդեն պտտել ես «'+nm(d.pid)+'» անունով։ Երկրորդ անգամ պտտել չի կարելի։':'';
+      lsSet('ss_name',nm(d.pid));show(d.pid,false);return}
+    const sp=await db.doc('games/'+code+'/spins/'+sel.value).get();
+    if(sp.exists){msg.textContent='Այս անունով արդեն պտտվել է։ Եթե դա դու ես, բացիր նույն սարքից։';btn.disabled=false;return}
+    await db.doc('games/'+code+'/spins/'+sel.value).set({by:uid});
+    await db.doc('games/'+code+'/spins/u_'+uid).set({by:uid,pid:sel.value});
+  }catch(e){msg.textContent='Չհաջողվեց, փորձիր նորից ('+(e.code||'')+')';btn.disabled=false;return}
+  lsSet('ss_name',nm(sel.value));show(sel.value,true)}
 init();
 </script></body></html>

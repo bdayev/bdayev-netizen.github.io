@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="hy"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -36,7 +37,7 @@ button:disabled{opacity:.6}
 </style></head><body><main id="app"><h1>🎅 Գաղտնի Սանտա</h1><p class="sub">Բեռնվում է…</p></main>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getFirestore,doc,collection,getDoc,setDoc,updateDoc,deleteDoc,onSnapshot,query,where,getDocs} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {initializeFirestore,doc,collection,getDoc,setDoc,updateDoc,deleteDoc,onSnapshot,query,where,getDocs} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {getAuth,createUserWithEmailAndPassword,signInWithEmailAndPassword,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 /* ====== ՍԱ ՓՈԽԵՔ. Firebase Console → Project settings → Your apps → Web app ====== */
@@ -49,7 +50,7 @@ const FIREBASE_CONFIG={
 /* ================================================================================== */
 
 const DOM='secret-santa.app'; // username -> username@secret-santa.app (միայն ներքին օգտագործման համար)
-const fapp=initializeApp(FIREBASE_CONFIG),fs=getFirestore(fapp),auth=getAuth(fapp);
+const fapp=initializeApp(FIREBASE_CONFIG),fs=initializeFirestore(fapp,{experimentalAutoDetectLongPolling:true}),auth=getAuth(fapp);
 const snap=s=>({id:s.id,exists:s.exists(),data:()=>s.data()});
 const lst2=s=>({docs:s.docs.map(d=>({id:d.id,data:()=>d.data()}))});
 const db={
@@ -58,7 +59,7 @@ const db={
 };
 
 const app=document.getElementById('app');
-let uid=null,uname='',G=null,P=[],code=null,unG=null,unP=null,tk=null,phaseKey='';
+let lastErr='',uid=null,uname='',G=null,P=[],code=null,unG=null,unP=null,tk=null,phaseKey='';
 const ALPHA='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const $=(t,a={},...k)=>{const e=document.createElement(t);for(const x in a){if(x==='on')for(const y in a.on)e.addEventListener(y,a.on[y]);else if(x==='cls')e.className=a[x];else e[x]=a[x]}k.flat().forEach(c=>e.append(c));return e};
 const pid=n=>encodeURIComponent(n.trim().toLowerCase().replace(/\s+/g,' ')).replace(/%/g,'~').replace(/[()!*']/g,'_').replace(/\./g,'~2E');
@@ -78,8 +79,8 @@ const isHost=()=>!!uid&&G&&G.hostId===uid;
 
 function init(){
   if(FIREBASE_CONFIG.apiKey.startsWith('YOUR')){app.replaceChildren($('h1',{},'🎅 Գաղտնի Սանտա'),$('p',{cls:'msg'},'Նախ index.html-ում լրացրեք FIREBASE_CONFIG-ը (տես README.md)։'));return}
-  let first=true;
-  onAuthStateChanged(auth,u=>{uid=u?u.uid:null;uname=u?u.email.split('@')[0]:'';if(first){first=false;addEventListener('hashchange',route);route()}else if(!code)home()})}
+  addEventListener('hashchange',route);route();
+  onAuthStateChanged(auth,u=>{uid=u?u.uid:null;uname=u?u.email.split('@')[0]:'';if(!code)home();else{phaseKey='';if(G!==undefined)draw()}})}
 function route(){const c=location.hash.slice(1).toUpperCase();c?openGame(c):home()}
 
 function authCard(){
@@ -116,14 +117,15 @@ function stop(){unG&&unG();unP&&unP();clearInterval(tk);unG=unP=null;phaseKey=''
 function openGame(c){
   stop();code=c;G=undefined;P=[];
   app.replaceChildren($('p',{cls:'sub'},'Բեռնվում է…'));
-  unG=db.doc('games/'+c).onSnapshot(s=>{G=s.exists?s.data():null;draw()},()=>{G=null;draw()});
+  unG=db.doc('games/'+c).onSnapshot(s=>{G=s.exists?s.data():null;draw()},e=>{G=null;lastErr=e&&e.code||'error';draw()});
+  setTimeout(()=>{if(G===undefined&&code===c)app.replaceChildren($('h1',{},'🎅 Գաղտնի Սանտա'),$('p',{cls:'msg'},'Կապը երկար է տևում։ Ստուգեք ինտերնետը և Firebase-ի Firestore-ի Rules/Database-ը, ապա թարմացրեք էջը։'),$('button',{on:{click:()=>location.reload()}},'Թարմացնել'))},10000);
   unP=db.collection('games/'+c+'/players').onSnapshot(s=>{P=s.docs.map(d=>({id:d.id,name:(d.data()||{}).name||d.id})).sort((a,b)=>a.name.localeCompare(b.name));draw()});
   tk=setInterval(()=>{if(G)draw()},1000)}
 
 let hdr,lst,act;
 function draw(){
   if(G===undefined)return;
-  if(G===null){app.replaceChildren($('h1',{},'🎅 Գաղտնի Սանտա'),$('p',{cls:'sub'},'Այդպիսի սենյակ չկա։'),$('button',{on:{click:()=>{location.hash=''}}},'Գլխավոր էջ'));phaseKey='';return}
+  if(G===null){app.replaceChildren($('h1',{},'🎅 Գաղտնի Սանտա'),$('p',{cls:'sub'},lastErr?'Չհաջողվեց բեռնել ('+lastErr+')։ Ստուգեք Firestore Rules-ը։':'Այդպիսի սենյակ չկա։'),$('button',{on:{click:()=>{location.hash=''}}},'Գլխավոր էջ'));phaseKey='';return}
   const ph=phase(),key=ph+(isHost()?'h':'')+(ph==='closed'?P.length:'');
   if(!hdr||!hdr.isConnected||key!==phaseKey){phaseKey=key;build(ph)}
   fillHdr(ph);fillList(ph)}

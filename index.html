@@ -126,7 +126,7 @@ function fillHdr(ph){
   const t=ph==='open'?'Գրանցումը բաց է մինչև '+hm(G.deadline)+' (մնաց '+f(Math.floor(left/36e5))+':'+f(Math.floor(left/6e4)%60)+':'+f(Math.floor(left/1e3)%60)+')':'Գրանցումը փակ է՝ կարող եք պտտել։';
   hdr.querySelector('.t').textContent=t;hdr.querySelector('h2').textContent=G.name}
 function fillList(ph){
-  lst.replaceChildren($('h2',{},'Մասնակիցներ ('+P.length+')'),...(P.length?P.map(p=>$('div',{cls:'pl'},$('span',{},p.name),isHost()&&ph==='open'?$('button',{cls:'x',title:'Հեռացնել',on:{click:()=>db.doc('games/'+code+'/players/'+p.id).delete()}},'✕'):''))):[document.createTextNode('Դեռ ոչ ոք չկա։')]))}
+  lst.replaceChildren($('h2',{},'Մասնակիցներ ('+P.length+')'),...(P.length?P.map(p=>$('div',{cls:'pl'},$('span',{},p.name),isHost()&&ph==='open'?$('button',{cls:'x',title:'Հեռացնել',on:{click:()=>db.doc('games/'+code+'/players/'+p.id).delete()}},'✕'):'')):[document.createTextNode('Դեռ ոչ ոք չկա։')]))}
 function build(ph){
   const cp=$('button',{cls:'o',on:{click:()=>{const u=location.href.split('#')[0]+'#'+code;navigator.clipboard&&navigator.clipboard.writeText(u).then(()=>{cp.textContent='Պատճենվեց ✓'},()=>{})}}},'Պատճենել հղումը');
   hdr=$('div',{cls:'card'},$('h2'),$('div',{cls:'code'},code),$('p',{cls:'t sub'}),
